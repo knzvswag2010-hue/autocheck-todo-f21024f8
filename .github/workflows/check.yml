@@ -1,0 +1,43 @@
+name: AutoCheck
+'on':
+- push
+- pull_request
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    - name: Create test runner
+      run: "cat > autocheck_runner.py << \"EOF\"\nimport json\nimport subprocess\n\
+        import sys\n\nTESTS = json.loads(r\"\"\"[{\"input\": \"321\", \"expected_output\"\
+        : \"123\"}]\"\"\")\nRUN_COMMAND = r\"\"\"python solution.py\"\"\"\n\npassed\
+        \ = 0\ntotal = len(TESTS)\n\ndef norm(s: str) -> str:\n    # Normalize newlines\n\
+        \    return (s or \"\").replace(\"\\r\\n\", \"\\n\").rstrip(\"\\n\")\n\nfor\
+        \ i, t in enumerate(TESTS, start=1):\n    inp = t.get(\"input\", \"\")\n \
+        \   exp = t.get(\"expected_output\", \"\")\n\n    print(f\"Running test {i}/{total}...\"\
+        )\n    p = subprocess.run(\n        RUN_COMMAND,\n        input=(inp or \"\
+        \"),\n        text=True,\n        capture_output=True,\n        shell=True,\n\
+        \    )\n\n    out = norm(p.stdout)\n    exp2 = norm(exp)\n    if p.returncode\
+        \ == 0 and out == exp2:\n        passed += 1\n        print(\"PASS\")\n  \
+        \  else:\n        print(\"FAIL\")\n        if p.stderr:\n            print(\"\
+        stderr:\", p.stderr)\n        print(f\"Expected: [{exp2}]\")\n        print(f\"\
+        Got:      [{out}]\")\n\nscore = int(round(100 * passed / total)) if total\
+        \ else 0\ndata = {\"passed\": passed, \"total\": total, \"score\": score}\n\
+        with open(\"score.json\", \"w\", encoding=\"utf-8\") as f:\n    json.dump(data,\
+        \ f, ensure_ascii=False)\nprint(\"SCORE_JSON:\", data)\n\nsys.exit(0 if passed\
+        \ == total else 1)\nEOF"
+    - name: Run tests
+      run: python autocheck_runner.py
+    - name: Upload score artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: autocheck-score
+        path: score.json
+    - name: All tests passed
+      run: echo "All tests passed successfully!"
